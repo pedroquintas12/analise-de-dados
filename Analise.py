@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-# USAR streamlit run Xgboost.py NO TERMINAL PARA RODAR O CODIGO
+# USAR streamlit run analise.py NO TERMINAL PARA RODAR O CODIGO
 
 # Carregar os dados
 @st.cache_data
