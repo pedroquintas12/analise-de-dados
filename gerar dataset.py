@@ -13,7 +13,7 @@ series_turmas = {
 disciplinas = [
     "Matemática", "Português", "História", "Geografia", "Biologia",
     "Química", "Física", "Educação Física", "Artes", "Filosofia",
-    "Sociologia", "Inglês", "Espanhol"
+    "Sociologia", "Inglês"
 ]
 
 generos = ["Masculino", "Feminino", "Outro"]
@@ -34,19 +34,31 @@ nomes = [{"Nome": f"{fake.first_name()} {fake.last_name()}"} for _ in range(360)
 # Cria o DataFrame
 df_nomes = pd.DataFrame(nomes)
 
-
 for serie, turmas in series_turmas.items():
     for turma, qtd in turmas.items():
-        for _ in range(qtd):
+        for i in range(qtd):
             notas = {f"Nota {disc}": round(np.random.uniform(0, 10), 2) for disc in disciplinas}
             media_geral = round(np.mean(list(notas.values())), 2)
+
+            # Cálculo da média das disciplinas de exatas
+            notas_exatas = [notas[f"Nota {disc}"] for disc in ["Matemática", "Física", "Química"]]
+            media_exatas = np.mean(notas_exatas)
+
+            # Definir frequência com base na média das disciplinas de exatas
+            if media_exatas < 3:
+                frequencia = round(np.random.uniform(20, 50), 2)
+            elif media_exatas < 6:
+                frequencia = round(np.random.uniform(40, 80), 2)
+            else:
+                frequencia = round(np.random.uniform(70, 100), 2)
+
             aluno = {
                 "ID": id_counter,
-                "Nome": nomes[_]["Nome"],
+                "Nome": nomes[i]["Nome"],
                 "Ano Letivo": 2025,
                 "Série": serie,
                 "Turma": turma,
-                "Evadido": round(np.random.uniform(20, 100), 2),
+                "Frequência (%)": frequencia,
                 **notas,
                 "Média Geral no ano": media_geral,
                 "Gênero": random.choice(generos),

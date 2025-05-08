@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -6,13 +7,9 @@ import shap
 import matplotlib.pyplot as plt
 import numpy as np
 
-# USAR streamlit run analise.py NO TERMINAL PARA RODAR O CÓDIGO
-
-# Carregar os dados
 @st.cache_data
 def carregar_dados():
     df = pd.read_excel("dataset_alunos.xlsx")
-    # Transforma 'Frequência (%)': 1 se < 40 (potencial evasão), 0 caso contrário
     df['Frequência (%)'] = df['Frequência (%)'].apply(lambda x: 1 if x < 40 else 0)
     return df
 
@@ -20,19 +17,16 @@ dados = carregar_dados()
 
 st.title("📊 Análise de Evasão Escolar com Filtros Interativos e SHAP")
 
-# Filtros na barra lateral
 st.sidebar.header("Filtros")
 turmas_opts = sorted(dados['Turma'].unique())
 generos_opts = sorted(dados['Gênero'].unique())
 faixa_renda_opts = sorted(dados['Faixa de Renda'].unique())
-
 
 turmas = st.sidebar.multiselect("Turmas", options=turmas_opts, default=turmas_opts)
 generos = st.sidebar.multiselect("Gênero", options=generos_opts, default=generos_opts)
 idades = st.sidebar.slider("Idade", int(dados['Idade'].min()), int(dados['Idade'].max()), (int(dados['Idade'].min()), int(dados['Idade'].max())))
 faixa_renda = st.sidebar.multiselect("Faixa de Renda", options=faixa_renda_opts, default=faixa_renda_opts)
 
-# Aplicar filtros
 dados_filtrados = dados[
     (dados['Turma'].isin(turmas)) &
     (dados['Gênero'].isin(generos)) &
@@ -47,8 +41,6 @@ else:
     evasao_counts = dados_filtrados['Frequência (%)'].value_counts(normalize=True).sort_index()
 
     fig_dist, ax_dist = plt.subplots()
-
-    # Mapear os índices (0, 1) para rótulos e cores corretos
     plot_data = pd.Series([0.0, 0.0], index=['Não Evadiu (0)', 'Evadiu (1)'])
     if 0 in evasao_counts.index:
         plot_data['Não Evadiu (0)'] = evasao_counts[0]
@@ -60,30 +52,30 @@ else:
     ax_dist.set_ylabel('Proporção')
     ax_dist.set_title('Distribuição da Evasão')
     st.pyplot(fig_dist)
-    plt.close(fig_dist) # Fecha a figura para liberar memória
+    plt.close(fig_dist)
 
+    st.markdown("""
+**🔍 Interpretação:**  
+Este gráfico mostra a proporção de alunos que **evadiram (vermelho)** e **não evadiram (verde)** com base nos filtros aplicados.  
+A evasão é considerada quando a frequência está abaixo de 40%.
+""")
 
-    # Preparar dados para o modelo
     dados_modelo = dados_filtrados.copy()
     colunas_remover = ['ID','Nome' ,'Ano Letivo', 'Série', 'Turma']
-    dados_modelo = dados_modelo.drop(columns=colunas_remover, errors='ignore') # errors='ignore' para não falhar se alguma coluna já foi removida
-
-    # Converter colunas categóricas em dummies
+    dados_modelo = dados_modelo.drop(columns=colunas_remover, errors='ignore')
     dados_dummies = pd.get_dummies(dados_modelo, drop_first=True, dummy_na=False)
 
     if 'Frequência (%)' not in dados_dummies.columns:
-        st.error("A coluna 'Frequência (%)' (variável alvo) não foi encontrada após a transformação dos dados. Verifique os passos anteriores.")
+        st.error("A coluna 'Frequência (%)' (variável alvo) não foi encontrada após a transformação dos dados.")
     else:
         X = dados_dummies.drop(columns=['Frequência (%)'])
         y = dados_dummies['Frequência (%)']
 
         if X.empty:
-            st.warning("Não há features (colunas X) para treinar o modelo após o pré-processamento. Verifique os dados e filtros.")
-        elif len(X) > 5 and len(y.unique()) > 1: # Adicionado verificação para número mínimo de amostras
+            st.warning("Não há features para treinar o modelo.")
+        elif len(X) > 5 and len(y.unique()) > 1:
             X = X.fillna(0).astype('float64')
-
             stratify_option = y if y.value_counts().min() > 1 else None
-
             X_train, X_test, y_train, y_test = train_test_split(
                 X, y, test_size=0.2, random_state=42, stratify=stratify_option
             )
@@ -95,14 +87,35 @@ else:
                 explainer = shap.Explainer(modelo, X_train)
                 shap_values = explainer(X_test)
 
-                # --- Correção para o SHAP Summary Plot ---
-                st.subheader("Importância das Variáveis (SHAP Summary)")
-                # shap.summary_plot já desenha na figura/eixo atual
-                shap.summary_plot(shap_values, X_test, show=False, plot_size=None)
-                fig_summary = plt.gcf() # Pega a figura que o SHAP plotou
-                st.pyplot(fig_summary)
-                plt.close(fig_summary) # Fecha a figura para liberar memória
-                # --- Fim da correção ---
+                st.subheader("Importância das Variáveis (Gráfico de Pizza)")
+                feature_names = X_test.columns
+                shap_vals_abs_mean = np.abs(shap_values.values).mean(axis=0)
+                if shap_vals_abs_mean.ndim == 2:
+                    shap_vals_abs_mean = shap_vals_abs_mean.mean(axis=1)
+
+                shap_importance_df = pd.DataFrame({
+                    'feature': feature_names,
+                    'importance': shap_vals_abs_mean
+                }).sort_values(by='importance', ascending=False)
+
+                top_n = 10
+                fig_pizza, ax_pizza = plt.subplots()
+                ax_pizza.pie(
+                    shap_importance_df['importance'].head(top_n),
+                    labels=shap_importance_df['feature'].head(top_n),
+                    autopct='%1.1f%%',
+                    startangle=140
+                )
+                ax_pizza.axis('equal')
+                plt.title("Importância das Variáveis (Top 10 - SHAP)")
+                st.pyplot(fig_pizza)
+                plt.close(fig_pizza)
+
+                st.markdown("""
+**🔍 Interpretação:**  
+Este gráfico de pizza mostra as **10 variáveis mais importantes** para o modelo prever a evasão.  
+Quanto maior a fatia, maior o impacto daquela variável no resultado.
+""")
 
                 st.subheader("Análise Individual com SHAP")
                 if not X_test.empty:
@@ -112,38 +125,59 @@ else:
 
                     explicacao_individual = shap_values[idx]
 
-                    # Gráfico waterfall para a Classe 0 ('Não Evadiu')
                     st.markdown("##### Explicação para a Classe 'Não Evadiu' (0)")
-                    fig_waterfall_nao_evadiu, ax_waterfall_nao_evadiu = plt.subplots()
-                    # !!! CORREÇÃO APLICADA AQUI !!!
-                    plt.sca(ax_waterfall_nao_evadiu) # Define o eixo como atual
-                    shap.plots.waterfall(explicacao_individual[:, 0], max_display=10, show=False) # Remove ax=
-                    ax_waterfall_nao_evadiu.set_title("Explicação para Não Evadiu (0)") # Adiciona título ao eixo
-                    st.pyplot(fig_waterfall_nao_evadiu)
-                    plt.close(fig_waterfall_nao_evadiu) # Fecha a figura para liberar memória
+                    valores = explicacao_individual.values[:, 0]
+                    features = X_test.columns
+                    top_indices = np.argsort(np.abs(valores))[-10:][::-1]
 
-                    # Gráfico waterfall para a Classe 1 ('Evadiu')
-                    # Verifica se a classe 1 existe na explicação (shap_values pode ter saídas para menos classes se y_train não tiver todas)
+                    fig_bar_nao_evadiu, ax_bar_nao_evadiu = plt.subplots()
+                    ax_bar_nao_evadiu.barh(
+                        [features[i] for i in top_indices],
+                        valores[top_indices],
+                        color='green'
+                    )
+                    ax_bar_nao_evadiu.set_xlabel("Valor SHAP")
+                    ax_bar_nao_evadiu.set_title("Top 10 Contribuições - Não Evadiu (0)")
+                    ax_bar_nao_evadiu.invert_yaxis()
+                    st.pyplot(fig_bar_nao_evadiu)
+                    plt.close(fig_bar_nao_evadiu)
+
+                    st.markdown("""
+**🔍 Interpretação:**  
+Este gráfico mostra **os fatores que levaram o modelo a prever que este aluno não evadiu**.  
+Barras verdes positivas ajudam a manter o aluno na escola, enquanto barras negativas sugerem risco.
+""")
+
                     if explicacao_individual.values.shape[1] > 1:
                         st.markdown("##### Explicação para a Classe 'Evadiu' (1)")
-                        fig_waterfall_evadiu, ax_waterfall_evadiu = plt.subplots()
-                        # !!! CORREÇÃO APLICADA AQUI !!!
-                        plt.sca(ax_waterfall_evadiu) # Define o eixo como atual
-                        shap.plots.waterfall(explicacao_individual[:, 1], max_display=10, show=False) # Remove ax=
-                        ax_waterfall_evadiu.set_title("Explicação para Evadiu (1)") # Adiciona título ao eixo
-                        st.pyplot(fig_waterfall_evadiu)
-                        plt.close(fig_waterfall_evadiu) # Fecha a figura para liberar memória
+                        valores = explicacao_individual.values[:, 1]
+                        top_indices = np.argsort(np.abs(valores))[-10:][::-1]
+
+                        fig_bar_evadiu, ax_bar_evadiu = plt.subplots()
+                        ax_bar_evadiu.barh(
+                            [features[i] for i in top_indices],
+                            valores[top_indices],
+                            color='red'
+                        )
+                        ax_bar_evadiu.set_xlabel("Valor SHAP")
+                        ax_bar_evadiu.set_title("Top 10 Contribuições - Evadiu (1)")
+                        ax_bar_evadiu.invert_yaxis()
+                        st.pyplot(fig_bar_evadiu)
+                        plt.close(fig_bar_evadiu)
+
+                        st.markdown("""
+**🔍 Interpretação:**  
+Este gráfico mostra **os fatores que levaram o modelo a prever que este aluno evadiu**.  
+Barras vermelhas positivas aumentam a chance de evasão, e negativas atuam como proteção.
+""")
+
                     else:
-                        st.info("Modelo não produziu explicações para a classe 'Evadiu (1)', possivelmente devido à ausência ou raridade desta classe nos dados de treino.")
-
+                        st.info("Modelo não produziu explicações para a classe 'Evadiu (1)'.")
                 else:
-                    st.warning("Conjunto de teste vazio. Não é possível exibir análise individual.")
-            elif not (len(y_train.unique()) > 1):
-                 st.warning("Não há variabilidade suficiente na variável de evasão nos dados de TREINO filtrados (apenas uma classe presente). Ajuste os filtros para incluir ambas as classes ('Evadiu' e 'Não Evadiu') para treinar o modelo e visualizar os gráficos SHAP.")
+                    st.warning("Conjunto de teste vazio.")
             else:
-                st.warning("Não há dados suficientes nos conjuntos de treino ou teste após a divisão. Ajuste os filtros.")
-
+                st.warning("Não há dados suficientes nos conjuntos de treino ou teste.")
         elif len(X) <= 5:
-             st.warning("Poucos dados após o filtro (< 6 amostras). Amplie os critérios para visualizar os gráficos SHAP.")
-        else: # len(y.unique()) <= 1
-            st.warning("Não há variabilidade suficiente na variável de evasão nos dados filtrados (apenas uma classe presente). Ajuste os filtros para incluir ambas as classes ('Evadiu' e 'Não Evadiu') para treinar o modelo e visualizar os gráficos SHAP.")
+            st.warning("Poucos dados após o filtro (< 6 amostras).")
+        else:
+            st.warning("Não há variabilidade suficiente na variável de evasão.")
