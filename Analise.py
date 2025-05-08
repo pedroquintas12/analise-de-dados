@@ -55,10 +55,10 @@ else:
     plt.close(fig_dist)
 
     st.markdown("""
-**🔍 Interpretação:**  
-Este gráfico mostra a proporção de alunos que **evadiram (vermelho)** e **não evadiram (verde)** com base nos filtros aplicados.  
-A evasão é considerada quando a frequência está abaixo de 40%.
-""")
+                **🔍 Interpretação:**  
+                Este gráfico mostra a proporção de alunos que **evadiram (vermelho)** e **não evadiram (verde)** com base nos filtros aplicados.  
+                A evasão é considerada quando a frequência está abaixo de 40%.
+                """)
 
     dados_modelo = dados_filtrados.copy()
     colunas_remover = ['ID','Nome' ,'Ano Letivo', 'Série', 'Turma']
@@ -112,10 +112,10 @@ A evasão é considerada quando a frequência está abaixo de 40%.
                 plt.close(fig_pizza)
 
                 st.markdown("""
-**🔍 Interpretação:**  
-Este gráfico de pizza mostra as **10 variáveis mais importantes** para o modelo prever a evasão.  
-Quanto maior a fatia, maior o impacto daquela variável no resultado.
-""")
+                            **🔍 Interpretação:**  
+                            Este gráfico de pizza mostra as **10 variáveis mais importantes** para o modelo prever a evasão.  
+                            Quanto maior a fatia, maior o impacto daquela variável no resultado.
+                            """)
 
                 st.subheader("Análise Individual com SHAP")
                 if not X_test.empty:
@@ -177,7 +177,7 @@ Barras vermelhas positivas aumentam a chance de evasão, e negativas atuam como 
                     st.warning("Conjunto de teste vazio.")
             else:
                 st.warning("Não há dados suficientes nos conjuntos de treino ou teste.")
-        elif len(X) <= 5:
+        elif len(X) <= 2:
             st.warning("Poucos dados após o filtro (< 6 amostras).")
         else:
             st.warning("Não há variabilidade suficiente na variável de evasão.")
